@@ -327,6 +327,16 @@ partial def specExprToLaurel (e : SpecExpr) (md : Imperative.MetaData Core.Expre
       some (mkStmt (.PrimitiveOp .Leq
         [mkStmt (.StaticCall (mkId "Any..as_int!") [s]) md,
          mkStmt (.StaticCall (mkId "Any..as_int!") [b]) md]) md)
+  | .intAdd left right => do
+    let l? ← specExprToLaurel left md; let r? ← specExprToLaurel right md
+    return do
+      let l ← l?; let r ← r?
+      some (mkStmt (.StaticCall (mkId "PAdd") [l, r]) md)
+  | .intSub left right => do
+    let l? ← specExprToLaurel left md; let r? ← specExprToLaurel right md
+    return do
+      let l ← l?; let r ← r?
+      some (mkStmt (.StaticCall (mkId "PSub") [l, r]) md)
   | .floatGe subject bound => do
     let s? ← specExprToLaurel subject md; let b? ← specExprToLaurel bound md
     return do

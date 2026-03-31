@@ -324,6 +324,10 @@ inductive SpecExpr where
 | intLit (value : Int)
 | intGe (subject : SpecExpr) (bound : SpecExpr)
 | intLe (subject : SpecExpr) (bound : SpecExpr)
+/-- Integer addition: `intAdd a b` represents `a + b`. -/
+| intAdd (left : SpecExpr) (right : SpecExpr)
+/-- Integer subtraction: `intSub a b` represents `a - b`. -/
+| intSub (left : SpecExpr) (right : SpecExpr)
 /-- A floating-point literal, stored as a string to preserve precision. -/
 | floatLit (value : String)
 | floatGe (subject : SpecExpr) (bound : SpecExpr)

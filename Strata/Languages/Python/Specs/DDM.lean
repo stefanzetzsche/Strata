@@ -85,6 +85,10 @@ op intGeExpr(subject : SpecExprDecl, bound : SpecExprDecl) : SpecExprDecl =>
   @[prec(15)] subject " >=_int " bound;
 op intLeExpr(subject : SpecExprDecl, bound : SpecExprDecl) : SpecExprDecl =>
   @[prec(15)] subject " <=_int " bound;
+op intAddExpr(left : SpecExprDecl, right : SpecExprDecl) : SpecExprDecl =>
+  @[prec(20)] left " +_int " right;
+op intSubExpr(left : SpecExprDecl, right : SpecExprDecl) : SpecExprDecl =>
+  @[prec(20)] left " -_int " right;
 op floatExpr(value : Str) : SpecExprDecl => value;
 op floatGeExpr(subject : SpecExprDecl, bound : SpecExprDecl) : SpecExprDecl =>
   @[prec(15)] subject " >=_float " bound;
@@ -251,6 +255,8 @@ private def SpecExpr.toDDM (e : SpecExpr) : DDM.SpecExprDecl SourceRange :=
   | .intLit v => .intExpr .none (toDDMInt .none v)
   | .intGe subj bound => .intGeExpr .none subj.toDDM bound.toDDM
   | .intLe subj bound => .intLeExpr .none subj.toDDM bound.toDDM
+  | .intAdd left right => .intAddExpr .none left.toDDM right.toDDM
+  | .intSub left right => .intSubExpr .none left.toDDM right.toDDM
   | .floatLit v => .floatExpr .none ⟨.none, v⟩
   | .floatGe subj bound => .floatGeExpr .none subj.toDDM bound.toDDM
   | .floatLe subj bound => .floatLeExpr .none subj.toDDM bound.toDDM
@@ -382,6 +388,8 @@ private def DDM.SpecExprDecl.fromDDM (d : DDM.SpecExprDecl SourceRange) : Specs.
   | .intExpr _ i => .intLit i.ofDDM
   | .intGeExpr _ subj bound => .intGe subj.fromDDM bound.fromDDM
   | .intLeExpr _ subj bound => .intLe subj.fromDDM bound.fromDDM
+  | .intAddExpr _ left right => .intAdd left.fromDDM right.fromDDM
+  | .intSubExpr _ left right => .intSub left.fromDDM right.fromDDM
   | .floatExpr _ ⟨_, v⟩ => .floatLit v
   | .floatGeExpr _ subj bound => .floatGe subj.fromDDM bound.fromDDM
   | .floatLeExpr _ subj bound => .floatLe subj.fromDDM bound.fromDDM
