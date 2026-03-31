@@ -454,21 +454,30 @@ def funcDeclToLaurel (procName : String) (func : FunctionDecl)
     [{ name := "result", type := match retType.val with
       | .TVoid => mkCore "Any"
       | _ => retType }]
-  if func.postconditions.size > 0 then
-    reportError func.loc "Postconditions not yet supported"
-  -- When preconditions exist, use TCore "Any" for all parameters and outputs
-  -- to match the Python→Laurel pipeline's Any-wrapping convention.
-  let (inputs, outputs, body) ←
-    if func.preconditions.size > 0 then do
+  -- When preconditions or postconditions exist, use TCore "Any" for all
+  -- parameters and outputs to match the Python→Laurel Any-wrapping convention.
+  let hasSpecs := func.preconditions.size > 0 || func.postconditions.size > 0
+  let (inputs, outputs) :=
+    if hasSpecs then
       let anyTy : HighTypeMd := mkCore "Any"
-      let anyInputs := inputs.map fun p => { p with type := anyTy }
-      let anyOutputs := outputs.map fun p => { p with type := anyTy }
+      (inputs.map fun p => { p with type := anyTy },
+       outputs.map fun p => { p with type := anyTy })
+    else (inputs, outputs)
+  -- Build precondition body (asserts) if any
+  let impl ← if func.preconditions.size > 0 then do
       let body ← buildSpecBody func.preconditions .empty
         (requiredParams := allArgs.filterMap fun a =>
           if a.default.isNone then some a.name else none)
-      pure (anyInputs, anyOutputs, body)
-    else
-      pure (inputs, outputs, Body.Opaque [] none [])
+      pure (some body)
+    else pure none
+  -- Build postcondition expressions if any
+  let fileMd ← mkFileMd
+  let postconds ← func.postconditions.toList.filterMapM fun postExpr => do
+    specExprToLaurel postExpr fileMd
+  -- Unified body: always use Opaque with optional impl and postconditions
+  let body : Body := match impl with
+    | some (.Transparent bodyExpr) => .Opaque postconds (some bodyExpr) []
+    | _ => .Opaque postconds none []
   let md ← mkMdWithFileRange func.loc
   return {
     name := procName
