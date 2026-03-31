@@ -387,9 +387,6 @@ public def combinePySpecLaurel
         -- Rename "result" → "LaurelResult" in postconditions to match user code output
         let renamedPostconds := postconds.map (renameIdent "result" "LaurelResult")
         -- Prepend assume(isfrom_int(param)) for each input parameter.
-        -- This is sound: pyspec preconditions use as_int! which requires isfrom_int.
-        -- Without these assumptions, the solver can't take the int-int branch of
-        -- PSub/PAdd and can't connect the body computation to the postcondition.
         let mkMd (e : Laurel.StmtExpr) : Laurel.StmtExprMd := ⟨e, bodyExpr.md⟩
         let assumes := proc.inputs.map fun param =>
           mkMd (.Assume (mkMd (.StaticCall (Laurel.mkId "Any..isfrom_int") [mkMd (.Identifier param.name)])))

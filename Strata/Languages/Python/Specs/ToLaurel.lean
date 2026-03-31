@@ -518,6 +518,13 @@ def funcDeclToLaurel (procName : String) (func : FunctionDecl)
   let fileMd ← mkFileMd
   let postconds ← func.postconditions.toList.filterMapM fun postExpr => do
     specExprToLaurel postExpr fileMd
+  -- Add isfrom_int(result) so callers know the return value is an integer.
+  -- This is needed for PSub/PAdd to take the int-int branch.
+  let postconds := if !postconds.isEmpty then
+    let resultIntExpr := mkStmt (.StaticCall (mkId "Any..isfrom_int")
+      [mkStmt (.Identifier (mkId "result")) fileMd]) fileMd
+    postconds ++ [resultIntExpr]
+  else postconds
   -- Build Laurel-level precondition expressions for the Procedure.preconditions
   -- field. CallElim uses these to assert preconditions at call sites and
   -- assume them in the body, enabling transitivity for internal calls.
