@@ -331,12 +331,28 @@ partial def specExprToLaurel (e : SpecExpr) (md : Imperative.MetaData Core.Expre
     let l? ← specExprToLaurel left md; let r? ← specExprToLaurel right md
     return do
       let l ← l?; let r ← r?
-      some (mkStmt (.StaticCall (mkId "PAdd") [l, r]) md)
+      -- Unwrap to int, add, re-wrap: from_int(as_int(l) + as_int(r))
+      let lInt := mkStmt (.StaticCall (mkId "Any..as_int!") [l]) md
+      let rInt := mkStmt (.StaticCall (mkId "Any..as_int!") [r]) md
+      let sum := mkStmt (.PrimitiveOp .Add [lInt, rInt]) md
+      some (mkStmt (.StaticCall (mkId "from_int") [sum]) md)
   | .intSub left right => do
     let l? ← specExprToLaurel left md; let r? ← specExprToLaurel right md
     return do
       let l ← l?; let r ← r?
-      some (mkStmt (.StaticCall (mkId "PSub") [l, r]) md)
+      -- Unwrap to int, subtract, re-wrap: from_int(as_int(l) - as_int(r))
+      let lInt := mkStmt (.StaticCall (mkId "Any..as_int!") [l]) md
+      let rInt := mkStmt (.StaticCall (mkId "Any..as_int!") [r]) md
+      let diff := mkStmt (.PrimitiveOp .Sub [lInt, rInt]) md
+      some (mkStmt (.StaticCall (mkId "from_int") [diff]) md)
+  | .intEq left right => do
+    let l? ← specExprToLaurel left md; let r? ← specExprToLaurel right md
+    return do
+      let l ← l?; let r ← r?
+      -- Unwrap to int, compare: as_int(l) == as_int(r)
+      let lInt := mkStmt (.StaticCall (mkId "Any..as_int!") [l]) md
+      let rInt := mkStmt (.StaticCall (mkId "Any..as_int!") [r]) md
+      some (mkStmt (.PrimitiveOp .Eq [lInt, rInt]) md)
   | .floatGe subject bound => do
     let s? ← specExprToLaurel subject md; let b? ← specExprToLaurel bound md
     return do
@@ -474,7 +490,9 @@ def funcDeclToLaurel (procName : String) (func : FunctionDecl)
       (inputs.map fun p => { p with type := anyTy },
        outputs.map fun p => { p with type := anyTy })
     else (inputs, outputs)
-  -- Build precondition body (asserts) if any
+  -- Build precondition body (asserts) if any.
+  -- These Assert statements are inlined at call sites by ProcedureInlining,
+  -- creating proof obligations for callers.
   let impl ← if func.preconditions.size > 0 then do
       let body ← buildSpecBody func.preconditions .empty
         (requiredParams := allArgs.filterMap fun a =>
@@ -485,6 +503,13 @@ def funcDeclToLaurel (procName : String) (func : FunctionDecl)
   let fileMd ← mkFileMd
   let postconds ← func.postconditions.toList.filterMapM fun postExpr => do
     specExprToLaurel postExpr fileMd
+  -- Build Laurel-level precondition expressions for the Procedure.preconditions
+  -- field. CallElim uses these to assert preconditions at call sites and
+  -- assume them in the body, enabling transitivity for internal calls.
+  let laurelPreconds ← func.preconditions.toList.filterMapM fun assertion => do
+    let msg := formatAssertionMessage assertion.message
+    let precondMd ← mkMdWithFileRange default msg
+    specExprToLaurel assertion.formula precondMd
   -- Unified body: always use Opaque with optional impl and postconditions
   let body : Body := match impl with
     | some (.Transparent bodyExpr) => .Opaque postconds (some bodyExpr) []
@@ -494,7 +519,7 @@ def funcDeclToLaurel (procName : String) (func : FunctionDecl)
     name := procName
     inputs := inputs.toList
     outputs := outputs
-    preconditions := []
+    preconditions := laurelPreconds
     determinism := .nondeterministic
     decreases := none
     isFunctional := false

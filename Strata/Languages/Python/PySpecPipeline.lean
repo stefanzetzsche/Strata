@@ -316,10 +316,30 @@ public def buildPreludeInfo (result : PySpecLaurelResult) : Python.PreludeInfo :
 
 /-- Combine PySpec and user Laurel programs into a single program,
     prepending External stubs so the Laurel `resolve` pass can see
-    prelude names (e.g. `print`, `from_string`). -/
+    prelude names (e.g. `print`, `from_string`).
+    Also copies preconditions from pyspec procedures to matching user-code
+    procedures so that body verification can assume them. -/
 public def combinePySpecLaurel
-    (pySpec user : Laurel.Program) : Laurel.Program :=
-  { staticProcedures := pySpec.staticProcedures ++ user.staticProcedures
+    (pySpec user : Laurel.Program)
+    (modulePrefixes : List String := []) : Laurel.Program :=
+  -- Build a map from unprefixed name → pyspec preconditions
+  let pyspecPreconds : Std.HashMap String (List Laurel.StmtExprMd) :=
+    modulePrefixes.foldl (init := {}) fun m pfx =>
+      if pfx.isEmpty then m
+      else
+        let pfxUnderscore := pfx ++ "_"
+        pySpec.staticProcedures.foldl (init := m) fun m proc =>
+          if proc.name.text.startsWith pfxUnderscore && !proc.preconditions.isEmpty then
+            let shortName := proc.name.text.drop pfxUnderscore.length |>.toString
+            if !shortName.contains '@' then m.insert shortName proc.preconditions
+            else m
+          else m
+  -- Copy preconditions to matching user-code procedures
+  let userProcs := user.staticProcedures.map fun proc =>
+    match pyspecPreconds[proc.name.text]? with
+    | some preconds => { proc with preconditions := preconds }
+    | none => proc
+  { staticProcedures := pySpec.staticProcedures ++ userProcs
     staticFields := pySpec.staticFields ++ user.staticFields
     types := pySpec.types ++ user.types
     constants := pySpec.constants ++ user.constants
@@ -416,6 +436,6 @@ public def pyAnalyzeLaurel
     | .error e => throw (.internal s!"Python to Laurel translation failed: {e}")
     | .ok result => pure result
 
-  return combinePySpecLaurel result.laurelProgram laurelProgram
+  return combinePySpecLaurel result.laurelProgram laurelProgram result.modulePrefixes
 
 end Strata

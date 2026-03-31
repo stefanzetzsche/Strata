@@ -585,9 +585,19 @@ def pyAnalyzeLaurelCommand : Command where
 
     -- Inline pyspec procedures so their precondition assertions are checked
     -- at call sites with concrete arguments.
+    -- First, run CallElim on pyspec procedures to replace calls with
+    -- assert(preconditions) + havoc + assume(postconditions). This ensures
+    -- that when a decorated function calls another decorated function,
+    -- the caller's preconditions (assumed by CallElim) can satisfy the
+    -- callee's preconditions (asserted by CallElim).
     let pyspecFiles := pflags.getRepeated "pyspec"
     let coreProgram ←
       if pyspecFiles.size > 0 then
+        -- CallElim: replace pyspec procedure calls with assert/havoc/assume
+        let coreProgram ← match Core.callElimUsingContract coreProgram with
+          | .error e => exitPyAnalyzeInternalError s!"CallElim failed: {e}"
+          | .ok prog => pure prog
+        -- Then inline remaining procedure bodies
         match Core.inlineProcedures coreProgram
               ⟨.some (fun name _ => name ≠ "__main__" && !preludeNames.contains name)⟩ with
         | .error e => exitPyAnalyzeInternalError s!"Inlining failed: {e}"

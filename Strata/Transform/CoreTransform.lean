@@ -252,7 +252,12 @@ def createAsserts
     : CoreTransformM (List Statement)
     := conds.mapM (fun (l, check) => do
           let newLabel ← genIdent l (fun s => s!"callElimAssert_{s}")
-          return Statement.assert newLabel.toPretty (Lambda.LExpr.substFvars check.expr subst) md)
+          -- Merge propertySummary from the check metadata (e.g. precondition
+          -- description) into the call-site metadata so it appears in output.
+          let mergedMd := match check.md.getPropertySummary with
+            | some summary => md.withPropertySummary summary
+            | none => md
+          return Statement.assert newLabel.toPretty (Lambda.LExpr.substFvars check.expr subst) mergedMd)
 
 /-- turns a list of preconditions into assumes with substitution -/
 def createAssumes
