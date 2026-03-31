@@ -650,7 +650,15 @@ def pyAnalyzeLaurelCommand : Command where
     let mut s := ""
     for vcResult in vcResults do
       let propertySummaryOption := vcResult.obligation.metadata.getPropertySummary
-      let propertyDescription := propertySummaryOption.getD vcResult.obligation.label
+      let propertyDescription := match propertySummaryOption with
+        | some summary =>
+          -- Extract call-site suffix from the label (e.g., "_7" from "func_assert(0)_7")
+          let label := vcResult.obligation.label
+          let suffix := match label.splitOn "_" |>.getLast? with
+            | some s => if s.toNat?.isSome then s!" (call site {s})" else ""
+            | none => ""
+          summary ++ suffix
+        | none => vcResult.obligation.label
       let (locationPrefix, locationSuffix) := match Imperative.getFileRange vcResult.obligation.metadata with
         | some fr =>
           if fr.range.isNone then ("", "")
