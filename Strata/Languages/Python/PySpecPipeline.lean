@@ -38,6 +38,8 @@ public structure PySpecLaurelResult where
   typeAliases : Std.HashMap String String := {}
   /-- Classes whose spec is considered exhaustive (lists all methods). -/
   exhaustiveClasses : Std.HashSet String := {}
+  /-- Module prefixes used when building pyspec Laurel names. -/
+  modulePrefixes : List String := []
 
 /-! ### Private Helpers -/
 
@@ -158,7 +160,8 @@ public def buildPySpecLaurel (pyspecEntries : Array (String × String))
   }
   return { laurelProgram := combinedLaurel, overloads := allOverloads
            functionSignatures := funcSigs, typeAliases := allTypeAliases
-           exhaustiveClasses := allExhaustiveClasses }
+           exhaustiveClasses := allExhaustiveClasses
+           modulePrefixes := (pyspecEntries.map (·.1)).toList }
 
 /-- Read dispatch Ion files and merge their overload tables. -/
 public def readDispatchOverloads
@@ -265,6 +268,24 @@ public def buildPreludeInfo (result : PySpecLaurelResult) : Python.PreludeInfo :
   -- Register functions under their Laurel names
   let symbols := merged.functions.foldl (init := symbols) fun m name =>
     m.insert name (.function name)
+  -- Register unprefixed procedure aliases for pyspec top-level functions.
+  -- When a pyspec module "heapq" defines "heappop", the Laurel procedure
+  -- is "heapq_heappop". User code that does `from heapq import heappop`
+  -- calls it as plain "heappop", so we register that alias here.
+  -- We use the module prefixes stored in pySpecLaurelResult to strip them.
+  let symbols := result.modulePrefixes.foldl (init := symbols) fun syms pfx =>
+    if pfx.isEmpty then syms
+    else
+      let pfxUnderscore := pfx ++ "_"
+      merged.procedures.fold (init := syms) fun m name sig =>
+        if name.startsWith pfxUnderscore then
+          let shortName := name.drop pfxUnderscore.length |>.toString
+          -- Skip class methods (contain @) and don't overwrite existing
+          if !shortName.contains '@' && !m.contains shortName then
+            let inlinable := merged.inlinableProcedures.contains name
+            m.insert shortName (.procedure name sig inlinable)
+          else m
+        else m
   -- Add unprefixed aliases from typeAliases
   let symbols := result.typeAliases.fold (init := symbols)
     fun syms unprefixed prefixed =>

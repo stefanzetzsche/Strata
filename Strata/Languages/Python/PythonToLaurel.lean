@@ -876,15 +876,25 @@ partial def translateCall (ctx : TranslationContext)
               else funcName
             | .error _ => funcName
           else funcName
+        -- Resolve pyspec alias: if funcName maps to a different Laurel name, use it
+        let funcName' := match ctx.importedSymbols[funcName']? with
+          | some (ImportedSymbol.procedure laurelName _ _) =>
+            if laurelName != funcName' then laurelName else funcName'
+          | _ => funcName'
         return mkCall funcName'
     | .Attribute _ val _attr _ =>
         let _target_trans ← translateExpr ctx val
         if opt_firstarg.isSome then
-          if let some (ImportedSymbol.procedure _ _ true) := ctx.importedSymbols[funcName]? then
-            return mkCall funcName
+          if let some (ImportedSymbol.procedure laurelName _ true) := ctx.importedSymbols[funcName]? then
+            return mkCall laurelName
           else
             return mkStmtExprMd (.Hole)
-        else return mkCall funcName
+        else
+          -- Use Laurel name if available (handles pyspec aliases)
+          let resolvedName := match ctx.importedSymbols[funcName]? with
+            | some (ImportedSymbol.procedure laurelName _ _) => laurelName
+            | _ => funcName
+          return mkCall resolvedName
     | _ => throw (.unsupportedConstruct "Invalid call construct" (toString (repr f)))
   -- When ** is used at the call site and we have a known function signature,
   -- expand the dictionary into individual arguments using DictStrAny_get
