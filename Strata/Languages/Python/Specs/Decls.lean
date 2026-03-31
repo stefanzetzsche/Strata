@@ -328,6 +328,8 @@ inductive SpecExpr where
 | intAdd (left : SpecExpr) (right : SpecExpr)
 /-- Integer subtraction: `intSub a b` represents `a - b`. -/
 | intSub (left : SpecExpr) (right : SpecExpr)
+/-- Integer multiplication: `intMul a b` represents `a * b`. -/
+| intMul (left : SpecExpr) (right : SpecExpr)
 /-- Integer equality: `intEq a b` represents `a == b`. -/
 | intEq (left : SpecExpr) (right : SpecExpr)
 /-- A floating-point literal, stored as a string to preserve precision. -/

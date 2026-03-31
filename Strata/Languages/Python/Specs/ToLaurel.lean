@@ -345,6 +345,15 @@ partial def specExprToLaurel (e : SpecExpr) (md : Imperative.MetaData Core.Expre
       let rInt := mkStmt (.StaticCall (mkId "Any..as_int!") [r]) md
       let diff := mkStmt (.PrimitiveOp .Sub [lInt, rInt]) md
       some (mkStmt (.StaticCall (mkId "from_int") [diff]) md)
+  | .intMul left right => do
+    let l? ← specExprToLaurel left md; let r? ← specExprToLaurel right md
+    return do
+      let l ← l?; let r ← r?
+      -- Unwrap to int, multiply, re-wrap: from_int(as_int(l) * as_int(r))
+      let lInt := mkStmt (.StaticCall (mkId "Any..as_int!") [l]) md
+      let rInt := mkStmt (.StaticCall (mkId "Any..as_int!") [r]) md
+      let prod := mkStmt (.PrimitiveOp .Mul [lInt, rInt]) md
+      some (mkStmt (.StaticCall (mkId "from_int") [prod]) md)
   | .intEq left right => do
     let l? ← specExprToLaurel left md; let r? ← specExprToLaurel right md
     return do
