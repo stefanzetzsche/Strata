@@ -546,7 +546,7 @@ def translateProcedure (proc : Procedure) : TranslateM Core.Procedure := do
   let postconditions : ListMap Core.CoreLabel Core.Procedure.Check ←
     match proc.body with
     | .Opaque postconds _ _ =>
-        translateChecks postconds "postcondition"
+        translateChecks postconds s!"{proc.name.text}:postcondition"
     | _ => pure []
   let modifies : List Core.Expression.Ident := []
   let bodyStmts : List Core.Statement ←

@@ -502,11 +502,17 @@ def funcDeclToLaurel (procName : String) (func : FunctionDecl)
   -- Build precondition body (asserts) if any.
   -- These Assert statements are inlined at call sites by ProcedureInlining,
   -- creating proof obligations for callers.
+  -- Always generate a body when there are postconditions, even if there are
+  -- no preconditions — CallElim needs a body to process internal calls.
   let impl ← if func.preconditions.size > 0 then do
       let body ← buildSpecBody func.preconditions .empty
         (requiredParams := allArgs.filterMap fun a =>
           if a.default.isNone then some a.name else none)
       pure (some body)
+    else if func.postconditions.size > 0 then do
+      let fileMd ← mkFileMd
+      let body := mkStmt (.Block [] none) fileMd
+      pure (some (.Transparent body))
     else pure none
   -- Build postcondition expressions if any
   let fileMd ← mkFileMd
