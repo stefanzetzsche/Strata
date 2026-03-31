@@ -271,6 +271,7 @@ private def mkMdWithFileRange (loc : SourceRange) (msg : String := "")
   let mut md : Imperative.MetaData Core.Expression := #[⟨Imperative.MetaData.fileRange, .fileRange fr⟩]
   if !msg.isEmpty then
     md := md.push ⟨Imperative.MetaData.message, .msg msg⟩
+    md := md.push ⟨Imperative.MetaData.propertySummary, .msg msg⟩
   return md
 
 /-- Wrap a StmtExpr with metadata containing a file range and optional message. -/
