@@ -662,12 +662,18 @@ def pyAnalyzeLaurelCommand : Command where
       let propertySummaryOption := vcResult.obligation.metadata.getPropertySummary
       let propertyDescription := match propertySummaryOption with
         | some summary =>
-          -- Extract call-site suffix from the label (e.g., "_7" from "func_assert(0)_7")
           let label := vcResult.obligation.label
-          let suffix := match label.splitOn "_" |>.getLast? with
-            | some s => if s.toNat?.isSome then s!" (call site {s})" else ""
-            | none => ""
-          summary ++ suffix
+          -- Postcondition body checks (label contains ":postcondition") get a
+          -- "[procname]" prefix instead of a "(call site N)" suffix.
+          if (label.splitOn ":postcondition" |>.length) > 1 then
+            let procName := label.splitOn ":" |>.head!
+            s!"[{procName}] {summary}"
+          else
+            -- Extract call-site suffix from the label (e.g., "_7" from "func_assert(0)_7")
+            let suffix := match label.splitOn "_" |>.getLast? with
+              | some s => if s.toNat?.isSome then s!" (call site {s})" else ""
+              | none => ""
+            summary ++ suffix
         | none => vcResult.obligation.label
       let (locationPrefix, locationSuffix) := match Imperative.getFileRange vcResult.obligation.metadata with
         | some fr =>
