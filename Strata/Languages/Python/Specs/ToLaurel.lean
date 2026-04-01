@@ -421,6 +421,20 @@ private def formatAssertionMessage (msg : Array MessagePart) : String :=
     | .expr _ => "<expr>"
   String.join parts.toList
 
+/-- Generate a human-readable message from a SpecExpr for postcondition labels. -/
+private def specExprToMessage : SpecExpr → String
+  | .var name => name
+  | .intLit v => toString v
+  | .intGe a b => s!"{specExprToMessage a} >= {specExprToMessage b}"
+  | .intLe a b => s!"{specExprToMessage a} <= {specExprToMessage b}"
+  | .intEq a b => s!"{specExprToMessage a} == {specExprToMessage b}"
+  | .intAdd a b => s!"{specExprToMessage a} + {specExprToMessage b}"
+  | .intSub a b => s!"{specExprToMessage a} - {specExprToMessage b}"
+  | .intMul a b => s!"{specExprToMessage a} * {specExprToMessage b}"
+  | .not e => s!"not ({specExprToMessage e})"
+  | .len e => s!"len({specExprToMessage e})"
+  | _ => "<expr>"
+
 /-- Build a procedure body that asserts preconditions.
     Outputs are already initialized non-deterministically. -/
 def buildSpecBody (preconditions : Array Assertion)
@@ -517,7 +531,10 @@ def funcDeclToLaurel (procName : String) (func : FunctionDecl)
   -- Build postcondition expressions if any
   let fileMd ← mkFileMd
   let postconds ← func.postconditions.toList.filterMapM fun postExpr => do
-    specExprToLaurel postExpr fileMd
+    -- Use the SpecExpr to generate a human-readable postcondition message
+    let msg := specExprToMessage postExpr
+    let postMd ← mkMdWithFileRange default msg
+    specExprToLaurel postExpr postMd
   -- Add isfrom_int(result) so callers know the return value is an integer.
   -- This is needed for PSub/PAdd to take the int-int branch.
   let postconds := if !postconds.isEmpty then
